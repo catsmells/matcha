@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>410 — __DISPLAY_NAME__</title>
+<style>
+  :root { --bg: #E2E2E2; --fg: #000000; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); min-height: 100vh; }
+  body {
+    font-family: 'Sazanami Gothic', 'IPAGothic', Menlo, Consolas, monospace;
+    font-size: 15px; line-height: 1.55; padding: 1.25rem 1.5rem;
+  }
+  .line { white-space: pre-wrap; word-break: break-word; }
+  .prompt { user-select: none; margin-right: 1ch; }
+  .dim { opacity: 0.55; }
+  a { color: var(--fg); text-decoration: underline; }
+  a:hover { background: var(--fg); color: var(--bg); text-decoration: none; }
+  .cursor {
+    display: inline-block; width: 0.55em; height: 1em;
+    background: var(--fg); vertical-align: -0.15em; margin-left: 1px;
+    animation: blink 1.05s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="line"><span class="prompt">__USER__@__HOST__[__DIR__]:  $</span> <span id="path">cat /removed</span></div>
+<div class="line"><span class="dim">cat: file existed once, but no longer does.</span></div>
+<div class="line"><span class="dim">error 410 — gone.</span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="prompt">__USER__@__HOST__[__DIR__]:  $</span> <a href="/">cd ~</a><span class="cursor"></span></div>
+<script>
+  document.getElementById('path').textContent = 'cat ' + (location.pathname || '/');
+</script>
+</body>
+</html>

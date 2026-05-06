@@ -1,0 +1,1 @@
+['cowsay <text>', 'have a cow say something']

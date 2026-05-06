@@ -1,0 +1,1 @@
+['fortune', 'print a random fortune']

@@ -1,0 +1,1 @@
+['sudo <cmd>', 'execute a command as superuser']

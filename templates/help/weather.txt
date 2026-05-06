@@ -1,0 +1,1 @@
+['weather <city>', 'current weather for a city']

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="the personal homepage of __DISPLAY_NAME__. interactive shell. type `help` to start.">
+<meta name="author" content="__DISPLAY_NAME__">
+<meta name="theme-color" content="#E2E2E2">
+<meta property="og:type" content="website">
+<meta property="og:title" content="__DISPLAY_NAME__'s homepage">
+<meta property="og:description" content="the personal homepage of __DISPLAY_NAME__. interactive shell.">
+<meta property="og:url" content="__SITE_URL__">
+<meta property="og:site_name" content="__DISPLAY_NAME__'s homepage">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="__USER__@__HOST__">
+<meta name="twitter:description" content="the personal command-line of __DISPLAY_NAME__. type `help` to start.">
+<link rel="alternate" type="application/atom+xml" title="__DISPLAY_NAME__'s blog" href="/feed.xml">
+<title>__DISPLAY_NAME__'s homepage</title>
+<style>
+__STYLES__
+</style>
+</head>
+<body>
+<div id="terminal"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+$(function () {
+  const USER = '__USER__';
+  const HOST = '__HOST__';
+  const DIR  = '__DIR__';
+  const SHARE_HANDLE = "__SHARE_HANDLE__";
+  const SHARE_ENABLED = __SHARE_BLOCK__;
+  const $term = $('#terminal');
+  let $currentInput  = null;
+  let history        = [];
+  let historyIdx     = 0;
+  let inputLocked    = false;
+  const startTime    = Date.now();
+
+  const THEMES = __THEMES__;
+  let currentTheme = 'light';
+  try { currentTheme = localStorage.getItem('lt:theme') || 'light'; } catch (e) {}
+  if (!THEMES[currentTheme]) currentTheme = 'light';
+  function applyTheme(t) {
+    if (!THEMES[t]) return;
+    document.documentElement.style.setProperty('--bg', THEMES[t].bg);
+    document.documentElement.style.setProperty('--fg', THEMES[t].fg);
+    currentTheme = t;
+    try { localStorage.setItem('lt:theme', t); } catch (e) {}
+  }
+  applyTheme(currentTheme);
+
+  const escapeHtml = s => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const promptHTML = () =>
+    `<span class="prompt">${USER}@${HOST}[${DIR}]:  $</span>`;
+  function print(html)    { $term.append(`<div class="line">${html}</div>`); }
+  function printText(t)   { print(escapeHtml(t)); }
+  function blank()        { print('&nbsp;'); }
+  function scrollBottom() { window.scrollTo(0, document.body.scrollHeight); }
+
+  function newPrompt() {
+    inputLocked = false;
+    const $line = $(
+      `<div class="input-line line">${promptHTML()}` +
+      `<span class="cmd-wrap">` +
+        `<span class="cmd-pre"></span><span class="cursor">█</span><span class="cmd-post"></span>` +
+        `<input class="cmd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">` +
+      `</span></div>`
+    );
+    $term.append($line);
+    const $wrap = $line.find('.cmd-wrap');
+    const $pre  = $line.find('.cmd-pre');
+    const $post = $line.find('.cmd-post');
+    $currentInput = $line.find('.cmd');
+    function sync() {
+      const val = $currentInput.val();
+      const pos = $currentInput[0].selectionStart ?? val.length;
+      $pre.text(val.slice(0, pos));
+      $post.text(val.slice(pos));
+    }
+    $currentInput.on('input keyup click select focus', sync);
+    $currentInput.on('focus', () => $wrap.removeClass('blurred'));
+    $currentInput.on('blur',  () => $wrap.addClass('blurred'));
+    $currentInput.on('keydown', handleKeydown);
+    $currentInput[0].focus({ preventScroll: true });
+    sync();
+    scrollBottom();
+  }
+  function setInputVal($inp, v) {
+    $inp.val(v);
+    if ($inp[0].setSelectionRange) $inp[0].setSelectionRange(v.length, v.length);
+    $inp.trigger('input');
+  }
+  function freezeCurrent(suffix) {
+    if (!$currentInput) return '';
+    const v = $currentInput.val() + (suffix || '');
+    const $wrap = $currentInput.closest('.cmd-wrap');
+    const $frozen = $('<span class="cmd-frozen"></span>').text(v);
+    $wrap.replaceWith($frozen);
+    $currentInput = null;
+    return v;
+  }
+  function splitBySemicolon(line) {
+    const parts = [];
+    let buf = '', inSingle = false, inDouble = false;
+    for (const c of line) {
+      if (!inDouble && c === "'") { inSingle = !inSingle; buf += c; continue; }
+      if (!inSingle && c === '"') { inDouble = !inDouble; buf += c; continue; }
+      if (!inSingle && !inDouble && c === ';') {
+        if (buf.trim()) parts.push(buf.trim());
+        buf = ''; continue;
+      }
+      buf += c;
+    }
+    if (buf.trim()) parts.push(buf.trim());
+    return parts;
+  }
+  async function execCommand(line) {
+    inputLocked = true;
+    if ($currentInput) { $currentInput.val(line); freezeCurrent(); }
+    if (line.trim()) {
+      history.push(line); historyIdx = history.length;
+      for (const cmd of splitBySemicolon(line)) {
+        try {
+          const result = runCommand(cmd);
+          if (result && typeof result.then === 'function') await result;
+        } catch (err) { printText('error: ' + err.message); }
+      }
+    }
+    newPrompt();
+  }
+  $(document).on('contextmenu', e => e.preventDefault());
+  $(document).on('mousedown', function (e) {
+    const t = e.target;
+    if ($(t).is('a, a *')) return;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+    if (window.getSelection().toString()) return;
+    if ($currentInput) setTimeout(() => $currentInput && $currentInput[0].focus({ preventScroll: true }), 0);
+  });
+  $(document).on('click', 'a[data-cmd]', function (e) {
+    e.preventDefault();
+    if (inputLocked) return;
+    execCommand(String($(this).attr('data-cmd')));
+  });
+  function handleKeydown(e) {
+    if (inputLocked) { e.preventDefault(); return; }
+    const $inp = $(e.currentTarget);
+    if (e.key === 'Enter') { e.preventDefault(); execCommand($inp.val()); }
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!history.length) return;
+      if (historyIdx > 0) historyIdx--;
+      setInputVal($inp, history[historyIdx] || '');
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIdx < history.length - 1) { historyIdx++; setInputVal($inp, history[historyIdx]); }
+      else { historyIdx = history.length; setInputVal($inp, ''); }
+    } else if (e.key === 'l' && e.ctrlKey) {
+      e.preventDefault();
+      const carry = $currentInput ? $currentInput.val() : '';
+      $term.empty(); $currentInput = null; newPrompt();
+      if (carry) setInputVal($currentInput, carry);
+    } else if (e.key === 'c' && e.ctrlKey) {
+      e.preventDefault();
+      inputLocked = true; freezeCurrent('^C'); newPrompt();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const val = $inp.val(), parts = val.split(/\s+/);
+      if (parts.length !== 1) return;
+      const matches = Object.keys(commands).filter(c => c.startsWith(parts[0]));
+      if (matches.length === 1) setInputVal($inp, matches[0] + ' ');
+      else if (matches.length > 1) {
+        freezeCurrent(); print(matches.join('   ')); newPrompt();
+        setInputVal($currentInput, val);
+      }
+    }
+  }
+
+  const commands = {
+    help() {
+      const rows = [
+__HELP_ROWS__
+      ];
+      const w = Math.max(...rows.map(r => r[0].length));
+      print(rows.map(([c, d]) =>
+        escapeHtml(c.padEnd(w + 4)) + '<span class="dim">' + escapeHtml(d) + '</span>'
+      ).join('<br>'));
+    },
+    myself() {
+      print([
+        __BIO__
+      ].filter(Boolean).join('<br>'));
+    },
+    contact() {
+      print([
+        '<span class="dim">—# contact #—————————————————————</span>',
+        '',
+        'email     <a href="mailto:__EMAIL__">__EMAIL__</a>',
+      ].join('<br>'));
+    },
+    man(args) {
+      if (!args[0]) { printText('what manual page do you want?'); return; }
+      const pages = {
+__MAN_ENTRIES__
+      };
+      const p = pages[args[0]];
+      if (p) printText(p);
+      else printText(`no manual entry for ${args[0]}`);
+    },
+__COMMANDS__
+  };
+
+  function runCommand(input) {
+    const parts = input.trim().split(/\s+/);
+    const cmd = parts[0], args = parts.slice(1);
+    if (commands[cmd]) return commands[cmd](args);
+    printText(`${cmd}: command not found. type \`help\` for a list.`);
+  }
+  print('<span class="dim">__ATTRIBUTION__</span>');
+  blank();
+  newPrompt();
+});
+</script>
+</body>
+</html>

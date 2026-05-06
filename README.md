@@ -1,5 +1,7 @@
 # matcha
 
+<img width="653" height="429" alt="image" src="https://github.com/user-attachments/assets/1c38344e-32f8-4075-bb14-84d6ff3e180e" />
+
 A wizard that generates a personal site shaped like a command-line shell. Pure HTML / CSS / JS / jQuery output. Zero build step. Deploy by uploading.
 
 ```
